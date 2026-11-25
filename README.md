@@ -3,7 +3,10 @@
 A static site built with Vite and served by nginx. The page shows the commit it
 was built from, so you can see each push go live.
 
-## One-time VM setup
+Follow the steps in order: the VM setup in step 3 needs the files that Verify
+clones in step 2.
+
+## 1. Prepare the VM
 
 Run on the VM as a user with sudo (for example `vyuh-user`):
 
@@ -20,8 +23,30 @@ NodeSource repository. If `node -v` shows v18 and `npm` is missing, Ubuntu's own
 Node package got installed instead; remove it with
 `sudo apt remove -y nodejs libnode109 nodejs-doc` and run the two lines again.
 
-Then connect the repo in VyuhStack (settings below) and click **Verify**, which
-clones it into `/opt/app`. After that, point nginx at the build output:
+## 2. Connect the repo in VyuhStack and Verify
+
+On the VM's page in VyuhStack, open **Deploy from Git**, click
+**Connect repository** and enter:
+
+| Field | Value |
+|---|---|
+| Repository URL | `https://github.com/Vyuhstack/vyuhstack-example-static.git` |
+| Branch | `main` |
+| Folder on VM | `/opt/app` |
+| Run as user | `vyuh-user` |
+| Step 1: Build | `npm ci`<br>`npm run build` |
+| Step 2: Release | leave empty |
+
+Click **Save**, then **Verify**. Verify creates `/opt/app`, clones the repo into
+it and checks the VM can pull from GitHub. The card then shows **Connected**.
+
+The release step stays empty: nginx reads files from disk on every request, so
+it serves the new `dist/` straight away. A reload is only needed when the nginx
+config itself changes.
+
+## 3. Point nginx at the build output
+
+Now that the repo is in `/opt/app`, install its nginx config:
 
 ```bash
 sudo cp /opt/app/deploy/nginx.conf /etc/nginx/sites-available/app
@@ -31,29 +56,32 @@ sudo nginx -t && sudo systemctl reload nginx
 ```
 
 nginx runs as `www-data`, so the app folder must be readable by others. Verify
-creates `/opt/app` with mode 755, which is enough.
+creates `/opt/app` with mode 755, which is enough. Until the first deploy builds
+`dist/`, nginx shows an error page; that's expected.
 
-## Deploy from Git settings
+Set the VM's application port in VyuhStack to `80`.
 
-| Field | Value |
-|---|---|
-| Repository URL | `https://github.com/Vyuhstack/vyuhstack-example-static.git` |
-| Branch | `main` |
-| Folder on VM | `/opt/app` |
-| Run as user | `vyuh-user` |
-| Build | `npm ci`<br>`npm run build` |
-| Release | leave empty (nginx serves the new `dist/` files straight away) |
+## 4. Deploy and check
 
-Application port in VyuhStack: `80`.
+Click **Deploy now**. The deploy goes Queued, Running, Success; expand the row to
+see the log. Then open the VM's hostname: the page shows `Commit <sha>`, matching
+the commit in the deploy row.
 
-## Check it
+## 5. Deploy on every push
 
-Open the VM's hostname. The page shows `Commit <sha>`. Push a change and the
-commit updates after the deploy finishes.
+In GitHub, open the repo's **Settings**, **Webhooks**, **Add webhook**, and paste
+the **Payload URL** and **Secret** from the **Auto-deploy on push** box on the
+card. Set **Content type** to `application/json` and pick **Just the push event**.
 
-## Try a failed build
+Push a change (for example edit `index.html`). A new deploy with trigger **Push**
+appears; click **Refresh** under Recent deploys to see it. When it finishes, the
+page shows the new commit.
 
-Add a syntax error to `src/main.js` and push. The deploy fails at the build
-step; note that Vite clears `dist/` at the start of a build, so a failed build
-can leave the site empty. For zero downtime, build into a new folder and switch
-a symlink in the release step.
+## 6. Try a failed build
+
+Add a syntax error to `src/main.js` and push. The deploy fails at the build step
+with the Vite error in the log.
+
+Vite clears `dist/` at the start of a build, so a failed build can leave the
+site empty until the next good deploy. For zero downtime, build into a new
+folder and switch a symlink in the release step.
