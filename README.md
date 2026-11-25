@@ -5,24 +5,29 @@ was built from, so you can see each push go live.
 
 ## One-time VM setup
 
-Run on the VM with sudo:
+Run on the VM as a user with sudo (for example `vyuh-user`):
 
 ```bash
-apt update && apt install -y git nginx
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt install -y nodejs
+sudo apt update && sudo apt install -y git nginx
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs
 
 # deploys run as vyuh-user in a non-interactive shell: this must print a path
-runuser -l vyuh-user -c 'command -v npm && node -v'
+sudo runuser -l vyuh-user -c 'command -v npm && node -v'
 ```
+
+Put `sudo` on `bash`, not on `curl`: the setup script must run as root to add the
+NodeSource repository. If `node -v` shows v18 and `npm` is missing, Ubuntu's own
+Node package got installed instead; remove it with
+`sudo apt remove -y nodejs libnode109 nodejs-doc` and run the two lines again.
 
 Then connect the repo in VyuhStack (settings below) and click **Verify**, which
 clones it into `/opt/app`. After that, point nginx at the build output:
 
 ```bash
-cp /opt/app/deploy/nginx.conf /etc/nginx/sites-available/app
-ln -sf /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app
-rm -f /etc/nginx/sites-enabled/default
-nginx -t && systemctl reload nginx
+sudo cp /opt/app/deploy/nginx.conf /etc/nginx/sites-available/app
+sudo ln -sf /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 nginx runs as `www-data`, so the app folder must be readable by others. Verify
